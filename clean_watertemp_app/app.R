@@ -8,8 +8,8 @@ library(shinythemes)
 library(DT)
 library(plotly)
 #to do: 
-#proxies to remove data
-#download funcitonality of new data
+# GET IT SO hitting th "update/render button doesn't redraw the data previously removed
+#download functionality of new data
 
 
 
@@ -108,20 +108,27 @@ clean_dates <- reactive({
   validate(
     need(!is.null(input_file() ), "Please upload a data set")
   )
-  clean_dates1 <- clean_dates_function(input_file())
+  clean_dates_function(input_file())
 })
 
 # creates reactive values to be modified; they'll be assigned dataframes
-
+# need to set this to null at first; for some reason the reactiveValues() function doesn't work super well with reactives 
+# that's why mod_df$x is set/altered below in an observe context
+  #temp_mod_df <- reactiveValues(cleaned = NULL)
   temp_mod_df <- reactiveValues(cleaned = NULL)
   
   # 
   # #assigns each reactive values a dataframe
-  # observe({
-  #   #initially assigned the original, cleaned data
-  # 
-  #   temp_mod_df$cleaned <- clean_dates()
-  # })
+  #need to get this part to work because this is the part that makes sure that each button press continuously decreases the row in the table;
+  #otherwise it resets
+  observe({
+    
+    #error:Warning: Error in UseMethod: no applicable method for 'mutate' applied to an object of class "character"
+    #was causing ap to crash, fixed by adding req(input_file()) because it was trying to apply the function with mutate in it when there was no data
+    req(input_file())
+    #initially assigned the original, cleaned data
+    temp_mod_df$cleaned <- clean_dates()
+  })
   # 
   # #creates proxies to use for datatables
   temp_cleaned_proxy <- DT::dataTableProxy('table2')
@@ -143,7 +150,9 @@ clean_dates <- reactive({
     
   })
   
+  
   # observe({
+  #   
   #   
   # })
 
@@ -185,8 +194,8 @@ clean_dates <- reactive({
     
     #table 2 output
     output$table2 <- renderDT({
-      #req(input_file())
-      isolate(temp_mod_df$cleaned)
+      req(input_file())
+      #isolate(temp_mod_df$cleaned)
       datatable(temp_mod_df$cleaned)
     })
 }
