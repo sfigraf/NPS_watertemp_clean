@@ -7,19 +7,24 @@ library(readxl)
 library(shinythemes)
 library(DT)
 library(plotly)
-#to do: update date range and slider based on file input
+#to do: 
 #proxies to remove data
 #download funcitonality of new data
-#slider decimal stuff
+
 
 
 options(shiny.maxRequestSize=600*1024^2)
 source("functions/clean_temp_dates_function.R")
 # Define UI for application that draws a histogram
+
+
+# UI  ---------------------------------------------------------------------
+
+
 ui <- fluidPage(
 
   navbarPage(title = "River Mile Temp Data",
-             theme = shinytheme("united"), #end of navbar page arguments; what follow is all inside it
+             theme = shinytheme("readable"), #end of navbar page arguments; what follow is all inside it
              
              tabPanel("Temp Data Clean",
                       sidebarLayout(
@@ -41,8 +46,20 @@ ui <- fluidPage(
                         
                         # Show a plot of the generated distribution
                         mainPanel(
-                          plotlyOutput("plot1")
-                        )
+                          tabsetPanel(
+                            tabPanel("Original Data",
+                                     plotlyOutput("plot1"),
+                                     DT::dataTableOutput("table1")
+                                     ),
+                            tabPanel("Cleaned Data",
+                                     plotlyOutput("plot2"),
+                                     DT::dataTableOutput("table2"),
+                                     downloadButton(outputId = "download1", label = "Save this data as CSV"),
+                                     
+                            ),
+                          ) #end of tabset panel
+                         
+                        ) #end of mainpanel
                       ) #end of sidebar layout
                     ) #end of clean temp data tab panel
   )#end of navbar page
@@ -66,28 +83,6 @@ server <- function(input, output, session) {
              skip = 1)
   })
   
-  # raw_data <- reactive({
-  #   if (!is.null(input$file1) && 
-  #       (input$file1sheet %in% sheets_name())) {
-  #     data <- read_excel(input$file1$datapath, 
-  #                        sheet = input$file1sheet,
-  #                        col_types = c("date", 
-  #                                      "text", "text", "text", "numeric", 
-  #                                      "numeric", "numeric", "numeric", 
-  #                                      "numeric", "numeric", "numeric", 
-  #                                      "numeric", "numeric", "numeric", 
-  #                                      "text", "text", "text", "text", "text", 
-  #                                      "text", "text", "text", "text", "text", 
-  #                                      "text", "text", "text", "text", "text", 
-  #                                      "text", "text", "text", "text", "text"), 
-  #                        
-  #                        skip = 1)
-  #     
-  #     return(data)
-  #   } else {
-  #     return(NULL)
-  #   }
-  # })
 
 # update UI logic ---------------------------------------------------------
 
@@ -98,12 +93,10 @@ server <- function(input, output, session) {
                          end = max(clean_dates()$datetime1) + 1)
     
     updateSliderInput(session, "slider1",
-                      min = min(clean_dates()$`Temp, °C (LGR S/N: 20338010, SEN S/N: 20338010)`) - 1,
-                      max = max(clean_dates()$`Temp, °C (LGR S/N: 20338010, SEN S/N: 20338010)`) + 1,
-                      value = c(min(clean_dates()$`Temp, °C (LGR S/N: 20338010, SEN S/N: 20338010)`),max(clean_dates()$`Temp, °C (LGR S/N: 20338010, SEN S/N: 20338010)`)),
+                      min = round(min(clean_dates()$`Temp, °C (LGR S/N: 20338010, SEN S/N: 20338010)`) - 1, digits = 0),
+                      max = round(max(clean_dates()$`Temp, °C (LGR S/N: 20338010, SEN S/N: 20338010)`) + 1, digits = 0),
+                      value = c(round(min(clean_dates()$`Temp, °C (LGR S/N: 20338010, SEN S/N: 20338010)`)), round(max(clean_dates()$`Temp, °C (LGR S/N: 20338010, SEN S/N: 20338010)`))),
                       step = 1
-                      #round = TRUE
-
                       )
   }
     # come back to this
@@ -112,11 +105,42 @@ server <- function(input, output, session) {
 
 # Temp_wrangle ------------------------------------------------------------
 clean_dates <- reactive({
-  
+  validate(
+    need(!is.null(input_file() ), "Please upload a data set")
+  )
   clean_dates1 <- clean_dates_function(input_file())
 })
 
-# Temp Plot ---------------------------------------------------------------
+# creates reactive values to be modified; they'll be assigned dataframes
+  temp_mod_df <- reactiveValues(cleaned = NULL)
+  # 
+  # #assigns each reactive values a dataframe
+  # observe({
+  #   #initially assigned the original, cleaned data
+  # 
+  #   temp_mod_df$cleaned <- clean_dates()
+  # })
+  # 
+  # #creates proxies to use for datatables
+  temp_cleaned_proxy <- DT::dataTableProxy('table2')
+  # 
+  # #if button is pressed to modify data, then use those filters in sidebar
+  observeEvent(input$button1,{
+
+    #makes df of the rows you don't want
+    problem_rows <- clean_dates() %>%
+      filter(
+        `Temp, °C (LGR S/N: 20338010, SEN S/N: 20338010)` >= input$slider1[1] & `Temp, °C (LGR S/N: 20338010, SEN S/N: 20338010)` <= input$slider1[2],
+        (datetime1 >= input$drange1[1] & datetime1 <= input$drange1[2])
+      )
+    #replace reactive val dataframe with new rows
+    temp_mod_df$cleaned <- anti_join(clean_dates(), problem_rows)
+
+    #put in the new filtered df with the proxy
+    DT::replaceData(temp_cleaned_proxy, temp_mod_df$cleaned)
+  })
+
+# Temp Outputs ---------------------------------------------------------------
 
 
     output$plot1 <- renderPlotly({
@@ -131,6 +155,32 @@ clean_dates <- reactive({
         labs(title = "Temp Data")
       
       ggplotly(plot)
+    })
+    
+    output$table1 <- renderDT({
+      req(input_file())
+      datatable(clean_dates(), editable = TRUE)
+    })
+    #cleaned data plot
+    output$plot2 <- renderPlotly({
+      
+      req(input_file())
+      # generate bins based on input$bins from ui.R
+      plot <- temp_mod_df$cleaned %>%
+        ggplot(aes(x = datetime1, y = `Temp, °C (LGR S/N: 20338010, SEN S/N: 20338010)`)) +
+        geom_line() +
+        theme_classic() +
+        #make this "from x date to x date
+        labs(title = "Temp Data")
+      
+      ggplotly(plot)
+    })
+    
+    #table 2 output
+    output$table2 <- renderDT({
+      #req(input_file())
+      isolate(temp_mod_df$cleaned)
+      datatable(temp_mod_df$cleaned)
     })
 }
 
