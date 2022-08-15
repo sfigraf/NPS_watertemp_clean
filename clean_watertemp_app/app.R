@@ -112,7 +112,9 @@ clean_dates <- reactive({
 })
 
 # creates reactive values to be modified; they'll be assigned dataframes
+
   temp_mod_df <- reactiveValues(cleaned = NULL)
+  
   # 
   # #assigns each reactive values a dataframe
   # observe({
@@ -138,7 +140,12 @@ clean_dates <- reactive({
 
     #put in the new filtered df with the proxy
     DT::replaceData(temp_cleaned_proxy, temp_mod_df$cleaned)
+    
   })
+  
+  # observe({
+  #   
+  # })
 
 # Temp Outputs ---------------------------------------------------------------
 
