@@ -7,11 +7,18 @@ library(readxl)
 library(shinythemes)
 library(DT)
 library(plotly)
+#library(shinyTime)
 #to do: 
-# GET IT SO hitting th "update/render button doesn't redraw the data previously removed
+#
 #download functionality of new data
+#catch error of csv read in "skip" argument so it doesn't crash when it's wrong
 
-
+textInputRow<-function (inputId, label, value = "") 
+{
+  div(style="display:inline-block",
+      tags$label(label, `for` = inputId), 
+      tags$input(id = inputId, type = "text", value = value,class="input-small"))
+}
 
 options(shiny.maxRequestSize=600*1024^2)
 source("functions/clean_temp_dates_function.R")
@@ -30,15 +37,27 @@ ui <- fluidPage(
                       sidebarLayout(
                         sidebarPanel(
                           fileInput('file1', 'Insert File', accept = c(".csv")),
+                          selectInput("select1", label = "Rows to Skip in file",choices = c(0,1), selected = 1),
+                          # sliderInput("slider.5", 
+                          #             "Date you want to take off",
+                          #             min = parse_date_time("2021-06-01 00:00:00", "ymd_HMS"),
+                          #             max = parse_date_time("2021-07-10 00:00:00", "ymd_HMS"), 
+                          #             value = c(parse_date_time("2021-06-01 00:00:00", "ymd_HMS"), parse_date_time("2021-07-10 00:00:00", "ymd_HMS"))
+                          #             ),#end of slider.5 input
                           dateRangeInput("drange1",
                                          "Date you want to take off",
                                          start = "2021-06-01",
                                          end = "2021-07-10"),
+                          splitLayout(textInput("text1", "Lower-bound hour range (excluded)", value = "0"),
+                                      textInput("text2", "Upper-bound hour range (included)", value = "0")
+                                      ),
+                          
                           sliderInput("slider1", "Temp range to exclude between selected date range above",
                                       min = 0,
                                       max = 50,  
                                       value = c(0,30),
                                       step = 1),
+                          
 
                         actionButton("button1",
                                      "Render/Update Data")
@@ -80,7 +99,7 @@ server <- function(input, output, session) {
              col_types = cols(`Coupler Attached (LGR S/N: 20338010)` = col_character(), 
                               `Host Connected (LGR S/N: 20338010)` = col_character(), 
                               `End Of File (LGR S/N: 20338010)` = col_character()), 
-             skip = 1)
+             skip = as.numeric(input$select1))
   })
   
 
@@ -118,8 +137,7 @@ clean_dates <- reactive({
   
   # 
   # #assigns each reactive values a dataframe
-  #need to get this part to work because this is the part that makes sure that each button press continuously decreases the row in the table;
-  #otherwise it resets
+  
   observe({
     
     #error:Warning: Error in UseMethod: no applicable method for 'mutate' applied to an object of class "character"
@@ -141,7 +159,9 @@ clean_dates <- reactive({
     problem_rows <- temp_mod_df$cleaned %>%
       filter(
         `Temp, °C (LGR S/N: 20338010, SEN S/N: 20338010)` >= input$slider1[1] & `Temp, °C (LGR S/N: 20338010, SEN S/N: 20338010)` <= input$slider1[2],
-        (datetime1 >= input$drange1[1] & datetime1 <= input$drange1[2])
+        datetime1 >= parse_date_time(paste0(input$drange1[1]," ", input$text1, ":00:00"),"ymd_HMS") &
+        datetime1 <= parse_date_time(paste0(input$drange1[2]," ", input$text2, ":00:00"),"ymd_HMS")
+        #(datetime1 >= input$drange1[1] & datetime1 <= input$drange1[2])
       )
     #replace reactive val dataframe with new rows
     # to CONTINUOUSLY remove values and prevent values from being added back to the table: anti join with temp_mod_df_cleaned
@@ -196,6 +216,22 @@ clean_dates <- reactive({
       #isolate(temp_mod_df$cleaned)
       datatable(temp_mod_df$cleaned)
     })
+    
+
+# Download Handler --------------------------------------------------------
+
+    output$download1 <- downloadHandler(
+      filename = 
+        function() {
+          paste0(as.character(input$file1$name), "_cleaned.csv")
+        }
+      ,
+      content = function(file) {
+        write_csv(temp_mod_df$cleaned, file)
+        
+        
+      }
+    ) #end of download1    
 }
 
 # Run the application 

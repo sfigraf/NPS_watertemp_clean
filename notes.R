@@ -33,12 +33,14 @@ data1 <- clean_dates_function(lacl_newhr_rm22_001_20200610_a)
 problem_rows <- data1 %>%
   
   filter(
-    `Temp, °C (LGR S/N: 20338010, SEN S/N: 20338010)` >= 4 & `Temp, °C (LGR S/N: 20338010, SEN S/N: 20338010)` <= 10,
-    datetime1 >= "2019-05-19" & datetime1 <= "2020-08-10"
+    #`Temp, °C (LGR S/N: 20338010, SEN S/N: 20338010)` >= 4 & `Temp, °C (LGR S/N: 20338010, SEN S/N: 20338010)` <= 10,
+    datetime1 >= parse_date_time(paste0("2019-05-19"," ", "22", ":00:00"),"ymd_HMS") &
+    datetime1 <= parse_date_time(paste0("2020-08-10"," ", "13", ":00:00"),"ymd_HMS")
   )
 
 #x <- na.omit(data1$Temp_Celsius)
 min(data1$`Temp, °C (LGR S/N: 20338010, SEN S/N: 20338010)`) 
+
 
 plot <- lacl_001_2020_11 %>%
   ggplot(aes(x = datetime1, y = `Temp, °C (LGR S/N: 20338010, SEN S/N: 20338010)`)) +
