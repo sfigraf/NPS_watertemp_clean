@@ -114,7 +114,6 @@ clean_dates <- reactive({
 # creates reactive values to be modified; they'll be assigned dataframes
 # need to set this to null at first; for some reason the reactiveValues() function doesn't work super well with reactives 
 # that's why mod_df$x is set/altered below in an observe context
-  #temp_mod_df <- reactiveValues(cleaned = NULL)
   temp_mod_df <- reactiveValues(cleaned = NULL)
   
   # 
@@ -137,24 +136,23 @@ clean_dates <- reactive({
   observeEvent(input$button1,{
 
     #makes df of the rows you don't want
-    problem_rows <- clean_dates() %>%
+    ###IMPORTANT to continuously remove values and prevent values from being added back to the table:
+    # need to take off more rows continuously from temp_mod_df$cleaned: before, code read problem_rows <- clean_dates() %>%
+    problem_rows <- temp_mod_df$cleaned %>%
       filter(
         `Temp, °C (LGR S/N: 20338010, SEN S/N: 20338010)` >= input$slider1[1] & `Temp, °C (LGR S/N: 20338010, SEN S/N: 20338010)` <= input$slider1[2],
         (datetime1 >= input$drange1[1] & datetime1 <= input$drange1[2])
       )
     #replace reactive val dataframe with new rows
-    temp_mod_df$cleaned <- anti_join(clean_dates(), problem_rows)
+    # to CONTINUOUSLY remove values and prevent values from being added back to the table: anti join with temp_mod_df_cleaned
+    #before, code read temp_mod_df$cleaned <- anti_join(clean_dates(), problem_rows)
+    temp_mod_df$cleaned <- anti_join(temp_mod_df$cleaned, problem_rows)
 
     #put in the new filtered df with the proxy
     DT::replaceData(temp_cleaned_proxy, temp_mod_df$cleaned)
     
   })
   
-  
-  # observe({
-  #   
-  #   
-  # })
 
 # Temp Outputs ---------------------------------------------------------------
 
