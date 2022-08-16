@@ -10,7 +10,7 @@ library(plotly)
 #library(shinyTime)
 #to do: 
 # csv automatic naming: remove".csv" superfluous
-#download functionality of new data
+# get update daterange to work with files older than 2018
 #catch error of csv read in "skip" argument so it doesn't crash when it's wrong
 
 # textInputRow<-function (inputId, label, value = "") 
@@ -21,7 +21,8 @@ library(plotly)
 # }
 
 options(shiny.maxRequestSize=600*1024^2)
-source("functions/clean_temp_dates_function.R")
+source("functions/2018_present_temp_dates_function.R")
+source("functions/pre_2018_clean_temp_function.R")
 # Define UI for application that draws a histogram
 
 
@@ -39,7 +40,7 @@ ui <- fluidPage(
                           fileInput('file1', 'Insert File', accept = c(".csv")),
                           selectInput("select1", label = "Rows to skip when reading in",choices = c(0,1,2,3), selected = 1),
                           selectInput("select2", label = "Rows to take off in file",choices = c(0,1,2,3), selected = 1),
-                          
+                          checkboxInput("check1", "Pre-2018 Data?"),
                           # sliderInput("slider.5", 
                           #             "Date you want to take off",
                           #             min = parse_date_time("2021-06-01 00:00:00", "ymd_HMS"),
@@ -92,25 +93,49 @@ server <- function(input, output, session) {
 # Upload logic ------------------------------------------------------------
   
   input_file <- reactive({
-    if (is.null(input$file1)) {
-      return("")
+    
+    #Warning: Error in UseMethod: no applicable method for 'filter' applied to an object of class "character"
+    #solved because i was using is.null() to check checkbox input when really needed to use TrRUE or FALSE
+     if (input$check1 == FALSE && !is.null(input$file1)) {
+      read_csv(file = input$file1$datapath, 
+               col_names = c("row_number1", "Datetime_GMT_0800", "Temp_Celsius", 
+                             "Coupler_Detached", "Coupler_Attached", "Host_Connected","End_of_File"),
+               col_types = cols(row_number1 = col_number(),
+                                Datetime_GMT_0800 = col_character(),
+                                Temp_Celsius = col_number(),
+                                Coupler_Attached = col_character(), 
+                                Host_Connected = col_character(), 
+                                End_of_File = col_character()), 
+               skip = as.numeric(input$select1)
+               
+      )
     }
     
-    # actually read the file
-    #can assign colum names here if 
-    read_csv(file = input$file1$datapath, 
-             col_names = c("row_number1", "Datetime_GMT_0800", "Temp_Celsius", 
-                           "Coupler_Detached", "Coupler_Attached", "Host_Connected","End_of_File"),
-             col_types = cols(row_number1 = col_number(),
-                              Datetime_GMT_0800 = col_character(),
-                              Temp_Celsius = col_number(),
-                              Coupler_Attached = col_character(), 
-                              Host_Connected = col_character(), 
-                              End_of_File = col_character()), 
-             skip = as.numeric(input$select1)
-             #skip = 1
-             )
-             #skip = as.numeric(input$select1))
+    else if (input$check1 == TRUE && !is.null(input$file1)) {
+      read_csv(input$file1$datapath,locale=locale(encoding="latin1"),
+               col_names = c("Date", "Time_GMT_0800", "Temp_Celsius"),
+               skip = as.numeric(input$select1)
+               )
+    }
+    
+    else {
+      return("")
+    }
+    # # actually read the file
+    # #can assign colum names here if 
+    # read_csv(file = input$file1$datapath, 
+    #          col_names = c("row_number1", "Datetime_GMT_0800", "Temp_Celsius", 
+    #                        "Coupler_Detached", "Coupler_Attached", "Host_Connected","End_of_File"),
+    #          col_types = cols(row_number1 = col_number(),
+    #                           Datetime_GMT_0800 = col_character(),
+    #                           Temp_Celsius = col_number(),
+    #                           Coupler_Attached = col_character(), 
+    #                           Host_Connected = col_character(), 
+    #                           End_of_File = col_character()), 
+    #          skip = as.numeric(input$select1)
+    #          
+    #          )
+             
   })
   
 
@@ -141,7 +166,13 @@ clean_dates <- reactive({
   input_file2 <- input_file() %>%
     filter(!row_number() %in% c(input$select2))
   
-  x <- clean_dates_function(input_file2)
+  if (input$check1 == FALSE) {
+    x <- clean_dates_post_2018_function(input_file2)
+  }
+  else {
+    x <- clean_dates_pre_2018_function(input_file2)
+  }
+  
   return(x)
 })
 

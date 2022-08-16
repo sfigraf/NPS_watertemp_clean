@@ -1,5 +1,6 @@
 ### clean_dates_function
-clean_dates_function <- function(temp_data) {
+## POST 2017
+clean_dates_post_2018_function <- function(temp_data) {
   
   #colnames(temp_data)[3] <- "Temp_Celsius"
   
