@@ -9,16 +9,16 @@ library(DT)
 library(plotly)
 #library(shinyTime)
 #to do: 
-#
+# csv automatic naming: remove".csv" superfluous
 #download functionality of new data
 #catch error of csv read in "skip" argument so it doesn't crash when it's wrong
 
-textInputRow<-function (inputId, label, value = "") 
-{
-  div(style="display:inline-block",
-      tags$label(label, `for` = inputId), 
-      tags$input(id = inputId, type = "text", value = value,class="input-small"))
-}
+# textInputRow<-function (inputId, label, value = "") 
+# {
+#   div(style="display:inline-block",
+#       tags$label(label, `for` = inputId), 
+#       tags$input(id = inputId, type = "text", value = value,class="input-small"))
+# }
 
 options(shiny.maxRequestSize=600*1024^2)
 source("functions/clean_temp_dates_function.R")
@@ -37,7 +37,9 @@ ui <- fluidPage(
                       sidebarLayout(
                         sidebarPanel(
                           fileInput('file1', 'Insert File', accept = c(".csv")),
-                          selectInput("select1", label = "Rows to Skip in file",choices = c(0,1), selected = 1),
+                          selectInput("select1", label = "Rows to skip when reading in",choices = c(0,1,2,3), selected = 1),
+                          selectInput("select2", label = "Rows to take off in file",choices = c(0,1,2,3), selected = 1),
+                          
                           # sliderInput("slider.5", 
                           #             "Date you want to take off",
                           #             min = parse_date_time("2021-06-01 00:00:00", "ymd_HMS"),
@@ -95,11 +97,20 @@ server <- function(input, output, session) {
     }
     
     # actually read the file
+    #can assign colum names here if 
     read_csv(file = input$file1$datapath, 
-             col_types = cols(`Coupler Attached (LGR S/N: 20338010)` = col_character(), 
-                              `Host Connected (LGR S/N: 20338010)` = col_character(), 
-                              `End Of File (LGR S/N: 20338010)` = col_character()), 
-             skip = as.numeric(input$select1))
+             col_names = c("row_number1", "Datetime_GMT_0800", "Temp_Celsius", 
+                           "Coupler_Detached", "Coupler_Attached", "Host_Connected","End_of_File"),
+             col_types = cols(row_number1 = col_number(),
+                              Datetime_GMT_0800 = col_character(),
+                              Temp_Celsius = col_number(),
+                              Coupler_Attached = col_character(), 
+                              Host_Connected = col_character(), 
+                              End_of_File = col_character()), 
+             skip = as.numeric(input$select1)
+             #skip = 1
+             )
+             #skip = as.numeric(input$select1))
   })
   
 
@@ -112,9 +123,9 @@ server <- function(input, output, session) {
                          end = max(clean_dates()$datetime1) + 1)
     
     updateSliderInput(session, "slider1",
-                      min = round(min(clean_dates()$`Temp, °C (LGR S/N: 20338010, SEN S/N: 20338010)`) - 1, digits = 0),
-                      max = round(max(clean_dates()$`Temp, °C (LGR S/N: 20338010, SEN S/N: 20338010)`) + 1, digits = 0),
-                      value = c(round(min(clean_dates()$`Temp, °C (LGR S/N: 20338010, SEN S/N: 20338010)`)), round(max(clean_dates()$`Temp, °C (LGR S/N: 20338010, SEN S/N: 20338010)`))),
+                      min = round(min(clean_dates()$Temp_Celsius) - 1, digits = 0),
+                      max = round(max(clean_dates()$Temp_Celsius) + 1, digits = 0),
+                      value = c(round(min(clean_dates()$Temp_Celsius)), round(max(clean_dates()$Temp_Celsius))),
                       step = 1
                       )
   }
@@ -127,7 +138,11 @@ clean_dates <- reactive({
   validate(
     need(!is.null(input_file() ), "Please upload a data set")
   )
-  clean_dates_function(input_file())
+  input_file2 <- input_file() %>%
+    filter(!row_number() %in% c(input$select2))
+  
+  x <- clean_dates_function(input_file2)
+  return(x)
 })
 
 # creates reactive values to be modified; they'll be assigned dataframes
@@ -158,7 +173,7 @@ clean_dates <- reactive({
     # need to take off more rows continuously from temp_mod_df$cleaned: before, code read problem_rows <- clean_dates() %>%
     problem_rows <- temp_mod_df$cleaned %>%
       filter(
-        `Temp, °C (LGR S/N: 20338010, SEN S/N: 20338010)` >= input$slider1[1] & `Temp, °C (LGR S/N: 20338010, SEN S/N: 20338010)` <= input$slider1[2],
+        Temp_Celsius >= input$slider1[1] & Temp_Celsius <= input$slider1[2],
         datetime1 >= parse_date_time(paste0(input$drange1[1]," ", input$text1, ":00:00"),"ymd_HMS") &
         datetime1 <= parse_date_time(paste0(input$drange1[2]," ", input$text2, ":00:00"),"ymd_HMS")
         #(datetime1 >= input$drange1[1] & datetime1 <= input$drange1[2])
@@ -182,7 +197,7 @@ clean_dates <- reactive({
       req(input_file())
         # generate bins based on input$bins from ui.R
       plot <- clean_dates() %>%
-        ggplot(aes(x = datetime1, y = `Temp, °C (LGR S/N: 20338010, SEN S/N: 20338010)`)) +
+        ggplot(aes(x = datetime1, y = Temp_Celsius)) +
         geom_line() +
         theme_classic() +
         #make this "from x date to x date
@@ -201,7 +216,7 @@ clean_dates <- reactive({
       req(input_file())
       # generate bins based on input$bins from ui.R
       plot <- temp_mod_df$cleaned %>%
-        ggplot(aes(x = datetime1, y = `Temp, °C (LGR S/N: 20338010, SEN S/N: 20338010)`)) +
+        ggplot(aes(x = datetime1, y = Temp_Celsius)) +
         geom_line() +
         theme_classic() +
         #make this "from x date to x date

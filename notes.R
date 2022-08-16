@@ -7,10 +7,18 @@ library(plotly)
 #                                            skip = 1)
 
 lacl_newhr_rm22_001_20200610_a <- read_csv("lacl_newhr_rm22_001_20200610_a.csv", 
-                                                col_types = cols(`Coupler Attached (LGR S/N: 20338010)` = col_character(), 
-                                                                         `Host Connected (LGR S/N: 20338010)` = col_character(), 
-                                                                          `End Of File (LGR S/N: 20338010)` = col_character()), 
-                                                skip = 1)
+                                           col_names = c("row_number1", "Datetime_GMT_0800", "Temp_Celsius", 
+                                                         "Coupler_Detached", "Coupler_Attached", "Host_Connected","End_of_File"),
+                                           col_types = cols(row_number1 = col_number(),
+                                                            Datetime_GMT_0800 = col_character(),
+                                                            Temp_Celsius = col_number(),
+                                                            Coupler_Attached = col_character(), 
+                                                            Host_Connected = col_character(), 
+                                                            End_of_File = col_character()), 
+                                                skip = 1
+                                           )
+x <- lacl_newhr_rm22_001_20200610_a %>%  
+  filter(!row_number() %in% c(1))
 
 #getting dates and times in order
 lacl_001_2020_11 <- lacl_newhr_rm22_001_20200610_a %>%
@@ -28,7 +36,7 @@ lacl_001_2020_11 <- lacl_newhr_rm22_001_20200610_a %>%
            ) 
   #rename(Temp_Celsius = `Temp, °C (LGR S/N: 20338010, SEN S/N: 20338010)`)
   
-data1 <- clean_dates_function(lacl_newhr_rm22_001_20200610_a)
+data1 <- clean_dates_function(x)
 
 problem_rows <- data1 %>%
   
@@ -42,8 +50,8 @@ problem_rows <- data1 %>%
 min(data1$`Temp, °C (LGR S/N: 20338010, SEN S/N: 20338010)`) 
 
 
-plot <- lacl_001_2020_11 %>%
-  ggplot(aes(x = datetime1, y = `Temp, °C (LGR S/N: 20338010, SEN S/N: 20338010)`)) +
+plot <- data1 %>%
+  ggplot(aes(x = datetime1, y = data1[3])) +
   geom_line() +
   theme_classic()
 
